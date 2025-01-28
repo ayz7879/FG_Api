@@ -1,0 +1,6 @@
+@FG_RO_PLANT_HostAddress = http://localhost:5079
+
+GET {{FG_RO_PLANT_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
