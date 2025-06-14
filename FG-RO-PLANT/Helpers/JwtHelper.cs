@@ -6,10 +6,10 @@ using System.Text;
 
 namespace FG_RO_PLANT.Helpers
 {
-    public class JwtHelper(IConfiguration configuration)
+    public class JwtHelper()
     {
-        //private readonly string? _secretKey = Environment.GetEnvironmentVariable("JWT_SECRET") ?? throw new InvalidOperationException("JWT_SECRET environment variable is missing");
-        private readonly string? _secretKey = configuration["JWT:Secret"] ?? throw new InvalidOperationException("JWT_SECRET environment variable is missing");
+        private readonly string? _secretKey = Environment.GetEnvironmentVariable("JWT_SECRET") ?? throw new InvalidOperationException("JWT_SECRET environment variable is missing");
+        //private readonly string? _secretKey = configuration["JWT:Secret"] ?? throw new InvalidOperationException("JWT_SECRET environment variable is missing");
 
         public string GenerateToken(User user)
         {
