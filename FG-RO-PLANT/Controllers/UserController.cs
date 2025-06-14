@@ -72,7 +72,7 @@ namespace FG_RO_PLANT.Controllers
         // Update Profile
         [HttpPut("updateProfile/{id}")]
         [Authorize]
-        public async Task<IActionResult> UpdateProfile(int id, RegisterDto user)
+        public async Task<IActionResult> UpdateProfile(int id, UpdateUserDto user)
         {
             if (id <= 0)
                 return NotFound(new { message = "User not found." });
@@ -90,48 +90,22 @@ namespace FG_RO_PLANT.Controllers
             }
         }
 
-        // Get Users with Pagination (Admin only)
-        [HttpGet("all")]
-        [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> GetAllUsers([FromQuery] int pageSize = 10, [FromQuery] int lastFetchId = 0)
-        {
-            try
-            {
-                var users = await _userService.GetAllUsersAsync(pageSize, lastFetchId);
-                var lastId = users.LastOrDefault()?.Id ?? 0;
-                return Ok(new { message = "Users fetched", data = users, lastFetchId = lastId });
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
-        }
-
-        // Get Total User Count (Admin only)
-        [HttpGet("count")]
-        [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> GetTotalUserCountAsync()
-        {
-            try
-            {
-                return Ok(new { TotalCount = await _userService.GetTotalUserCountAsync() });
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { message = ex.Message });
-            }
-        }
-
         // Get Users by saerch (Admin only)
         [HttpGet("search")]
         [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> GetSearchUsers([FromQuery] string searchTerm = "",[FromQuery] int pageSize = 10, [FromQuery] int lastFetchId = 0)
+        public async Task<IActionResult> GetUsers([FromQuery] string searchTerm = "", [FromQuery] int page = 1, [FromQuery] int pageSize = 10)
         {
             try
             {
-                var users = await _userService.SearchUsersAsync(searchTerm, pageSize, lastFetchId);
-                var lastId = users.LastOrDefault()?.Id ?? 0;
-                return Ok(new { message = "Users fetched", data = users, lastFetchId = lastId });
+                var (users, totalCount) = await _userService.GetUsersAsync(searchTerm, page, pageSize);
+                return Ok(new
+                {
+                    message = "Users fetched",
+                    TotalCount = totalCount,
+                    Page = page,
+                    PageSize = pageSize,
+                    Users = users
+                });
             }
             catch (Exception ex)
             {
@@ -163,7 +137,7 @@ namespace FG_RO_PLANT.Controllers
         // Update User (Admin only)
         [HttpPut("update/{id}")]
         [Authorize(Roles = "Admin")]
-        public async Task<IActionResult> UpdateUser(int id, RegisterDto user)
+        public async Task<IActionResult> UpdateUser(int id, UpdateUserDto user)
         {
             if (id <= 0)
                 return NotFound(new { message = "User not found." });

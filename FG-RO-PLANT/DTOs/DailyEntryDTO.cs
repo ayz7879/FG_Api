@@ -8,19 +8,19 @@ namespace FG_RO_PLANT.DTOs
         public int CustomerId { get; set; }
 
         [Range(0, int.MaxValue, ErrorMessage = "Jar Given must be a non-negative value.")]
-        public int? JarGiven { get; set; }
+        public int? JarGiven { get; set; } = 0;
 
         [Range(0, int.MaxValue, ErrorMessage = "Jar Taken must be a non-negative value.")]
-        public int? JarTaken { get; set; }
+        public int? JarTaken { get; set; } = 0;
 
         [Range(0, int.MaxValue, ErrorMessage = "Capsule Given must be a non-negative value.")]
-        public int? CapsuleGiven { get; set; }
+        public int? CapsuleGiven { get; set; } = 0;
 
         [Range(0, int.MaxValue, ErrorMessage = "Capsule Taken must be a non-negative value.")]
-        public int? CapsuleTaken { get; set; }
+        public int? CapsuleTaken { get; set; } = 0;
 
         [Range(0, double.MaxValue, ErrorMessage = "Customer Pay must be a non-negative value.")]
-        public decimal? CustomerPay { get; set; }
+        public decimal? CustomerPay { get; set; } = 0;
 
         [Required(ErrorMessage = "Date is required.")]
         public DateOnly? DateField { get; set; }

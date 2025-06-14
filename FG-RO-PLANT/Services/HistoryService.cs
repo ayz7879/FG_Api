@@ -58,10 +58,9 @@ namespace FG_RO_PLANT.Services
         // Get History by Date Range
         public async Task<List<HistoryWithDetails>> GetHistoryAsync(DateOnly? startDate = null, DateOnly? endDate = null, int pageSize = 10, int lastFetchId = 0)
         {
-            var query = from h in _context.Histories
-                        join de in _context.DailyEntries on h.DailyEntryId equals de.Id
-                        join c in _context.Customers on de.CustomerId equals c.Id
-                        where h.Id > lastFetchId
+            var query = from h in _context.Histories.AsNoTracking()
+                        join de in _context.DailyEntries.AsNoTracking() on h.DailyEntryId equals de.Id
+                        join c in _context.Customers.AsNoTracking() on de.CustomerId equals c.Id
                         select new HistoryWithDetails
                         {
                             HistoryId = h.Id,
@@ -69,7 +68,8 @@ namespace FG_RO_PLANT.Services
                             DailyEntryId = de.Id,
                             DailyEntryData = de,
                             CustomerName = c.Name,
-                            CustomerAddress = c.Address
+                            CustomerAddress = c.Address,
+                            CustomerPhone = c.Phone
                         };
 
             if (startDate.HasValue)
@@ -78,23 +78,34 @@ namespace FG_RO_PLANT.Services
             if (endDate.HasValue)
                 query = query.Where(h => h.DateField <= endDate.Value);
 
-            return await query
-                .OrderBy(h => h.HistoryId)
-                .Take(pageSize)
-                .ToListAsync();
+            if (!startDate.HasValue && !endDate.HasValue)
+            {
+                lastFetchId = lastFetchId > 0 ? lastFetchId : int.MaxValue;
+                query = query.Where(h => h.HistoryId < lastFetchId)
+                             .OrderByDescending(h => h.HistoryId)
+                             .Take(pageSize);
+            }
+            else
+            {
+                query = query.OrderByDescending(h => h.DateField);
+            }
+
+            return await query.ToListAsync();
         }
 
         // Get History Summary
         public async Task<object> GetHistorySummaryAsync(DateOnly? startDate = null, DateOnly? endDate = null)
         {
-            var query = _context.Histories.AsQueryable()
-                .Join(_context.DailyEntries, h => h.DailyEntryId, de => de.Id, (h, de) => new { h, de });
+            var query = _context.Histories.AsNoTracking()
+                .Join(_context.DailyEntries.AsNoTracking(), h => h.DailyEntryId, de => de.Id, (h, de) => new { h, de });
 
             if (startDate.HasValue)
                 query = query.Where(x => x.h.DateField >= startDate.Value);
 
             if (endDate.HasValue)
                 query = query.Where(x => x.h.DateField <= endDate.Value);
+
+            var totalEntries = await query.AsNoTracking().CountAsync();
 
             var summary = await query
                 .GroupBy(x => 1) 
@@ -110,6 +121,7 @@ namespace FG_RO_PLANT.Services
 
             return new
             {
+                TotalEntries = totalEntries,
                 TotalJarGiven = summary?.TotalJarGiven ?? 0,
                 TotalJarTaken = summary?.TotalJarTaken ?? 0,
                 TotalCapsuleGiven = summary?.TotalCapsuleGiven ?? 0,

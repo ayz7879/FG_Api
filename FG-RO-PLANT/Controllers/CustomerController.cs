@@ -68,15 +68,17 @@ namespace FG_RO_PLANT.Controllers
 
         // Get Total Customer Count
         [HttpGet("count")]
-        public async Task<IActionResult> GetTotalCustomerCountAsync([FromQuery] int customerType = 0)
+        public async Task<IActionResult> GetTotalCustomerCountAsync()
         {
-            if (customerType < 0 || customerType > 2)
-            {
-                return BadRequest(new { message = "Invalid customerType." });
-            }
             try
             {
-                return Ok(new { TotalCount = await _customerService.GetTotalCustomerCountAsync(customerType) });
+                var counts = await _customerService.GetTotalCustomerCountAsync();
+                return Ok(new
+                {
+                    All = counts[0],
+                    Regular = counts[1],
+                    Events = counts[2]
+                });
             }
             catch (Exception ex)
             {
@@ -136,6 +138,21 @@ namespace FG_RO_PLANT.Controllers
             catch (Exception ex)
             {
                 return NotFound(new { message = ex.Message });
+            }
+        }
+
+        // Get due customers
+        [HttpGet("due-customers")]
+        public async Task<IActionResult> GetDueCustomers(int page = 1, int pageSize = 10, string? search = null)
+        {
+            try
+            {
+                var result = await _customerService.GetDueCustomersAsync(page, pageSize, search);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
             }
         }
     }

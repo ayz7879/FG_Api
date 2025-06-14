@@ -19,4 +19,24 @@
         public CustomerType CustomerType { get; set; } = CustomerType.Regular;
     }
 
+    public class CustomerPayment
+    {
+        public int Id { get; set; }
+        public string? Name { get; set; }
+        public string? Address { get; set; }
+        public string? Phone { get; set; }
+        public decimal? PricePerJar { get; set; }
+        public decimal? PricePerCapsule { get; set; }
+        public int? DueAmount { get; set; }
+    }
+
+    public class DueCustomerResponse
+    {
+        public List<CustomerPayment> Data { get; set; } = [];
+        public int TotalDueAmount { get; set; }
+        public int TotalDueCustomer { get; set; }
+        public int CurrentPage { get; set; }
+        public int PageSize { get; set; }
+    }
+
 }

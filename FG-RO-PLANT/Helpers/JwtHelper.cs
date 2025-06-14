@@ -6,9 +6,10 @@ using System.Text;
 
 namespace FG_RO_PLANT.Helpers
 {
-    public class JwtHelper
+    public class JwtHelper(IConfiguration configuration)
     {
-        private readonly string? _secretKey = Environment.GetEnvironmentVariable("JWT_SECRET") ?? throw new InvalidOperationException("JWT_SECRET environment variable is missing");
+        //private readonly string? _secretKey = Environment.GetEnvironmentVariable("JWT_SECRET") ?? throw new InvalidOperationException("JWT_SECRET environment variable is missing");
+        private readonly string? _secretKey = configuration["JWT:Secret"] ?? throw new InvalidOperationException("JWT_SECRET environment variable is missing");
 
         public string GenerateToken(User user)
         {
@@ -16,6 +17,7 @@ namespace FG_RO_PLANT.Helpers
             {
                 new Claim(ClaimTypes.Name, user.Name ?? ""),
                 new Claim(ClaimTypes.Role, user.Role.ToString()),
+                new Claim("UserId", user.Id.ToString())
             };
 
             var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_secretKey ?? ""));

@@ -36,4 +36,9 @@ namespace FG_RO_PLANT.DTOs
         public string? Password { get; set; }
     }
 
+    public class UpdateUserDto : RegisterDto
+    {
+        public new string? Password { get; set; } = null;
+    }
+
 }

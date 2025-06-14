@@ -57,19 +57,16 @@ namespace FG_RO_PLANT.Services
         }
 
         // Total count customer
-        public async Task<int> GetTotalCustomerCountAsync(int customerType)
+        public async Task<Dictionary<int, int>> GetTotalCustomerCountAsync()
         {
-            if (customerType > 0)
+            var result = new Dictionary<int, int>
             {
-                return await _context.Customers
-                    .AsNoTracking()
-                    .Where(c => (int)c.CustomerType == customerType)
-                    .CountAsync();
-            }
-            else
-            {
-                return await _context.Customers.AsNoTracking().CountAsync();
-            }
+                { 0, await _context.Customers.AsNoTracking().CountAsync() },
+                { 1, await _context.Customers.AsNoTracking().Where(c => (int)c.CustomerType == 1).CountAsync() },
+                { 2, await _context.Customers.AsNoTracking().Where(c => (int)c.CustomerType == 2).CountAsync() }
+            };
+
+            return result;
         }
 
         // Search Customers
@@ -95,6 +92,18 @@ namespace FG_RO_PLANT.Services
         {
             var existingCustomer = await _context.Customers.FindAsync(id) ?? throw new Exception("Customer not found");
 
+            // Check if phone number is being changed
+            if (existingCustomer.Phone != updatedCustomer.Phone)
+            {
+                bool phoneExists = await _context.Customers
+                    .AsNoTracking().AnyAsync(c => c.Phone == updatedCustomer.Phone && c.Id != id);
+
+                if (phoneExists)
+                {
+                    throw new Exception("Phone Number already exists !");
+                }
+            }
+
             existingCustomer.Name = updatedCustomer.Name;
             existingCustomer.Address = updatedCustomer.Address;
             existingCustomer.Phone = updatedCustomer.Phone;
@@ -119,5 +128,60 @@ namespace FG_RO_PLANT.Services
             await _context.SaveChangesAsync();
             return "Customer deleted successfully";
         }
+
+        // Get all due amount customer
+        public async Task<DueCustomerResponse> GetDueCustomersAsync(int page, int pageSize, string? search)
+        {
+            var loweredSearch = search?.ToLower();
+            // First get aggregated data using raw SQL or simpler LINQ
+            var customerDueData = await (
+                from c in _context.Customers.AsNoTracking()
+                join e in _context.DailyEntries.AsNoTracking() on c.Id equals e.CustomerId
+                where string.IsNullOrEmpty(loweredSearch) ||
+                      c.Name.ToLower().Contains(loweredSearch) ||
+                      c.Phone.ToLower().Contains(loweredSearch) ||
+                      c.Address.ToLower().Contains(loweredSearch)
+                group new { e.JarGiven, e.CapsuleGiven, e.CustomerPay, c.PricePerJar, c.PricePerCapsule }
+                by new { c.Id, c.Name, c.Address, c.Phone, c.PricePerJar, c.PricePerCapsule } into g
+                select new
+                {
+                    Customer = g.Key,
+                    TotalJar = g.Sum(x => x.JarGiven),
+                    TotalCapsule = g.Sum(x => x.CapsuleGiven),
+                    TotalPaid = g.Sum(x => x.CustomerPay)
+                }).ToListAsync();
+
+            // Calculate due amounts in memory (small dataset after grouping)
+            var dueCustomers = customerDueData
+                .Select(x => new CustomerPayment
+                {
+                    Id = x.Customer.Id,
+                    Name = x.Customer.Name,
+                    Address = x.Customer.Address,
+                    Phone = x.Customer.Phone,
+                    PricePerJar = x.Customer.PricePerJar,
+                    PricePerCapsule = x.Customer.PricePerCapsule,
+                    DueAmount = (int)((x.TotalJar * x.Customer.PricePerJar) + (x.TotalCapsule * x.Customer.PricePerCapsule) - x.TotalPaid)
+                })
+                .Where(x => x.DueAmount > 0)
+                .OrderByDescending(x => x.DueAmount)
+                .ToList();
+
+            // Apply pagination
+            var pagedData = dueCustomers
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
+            return new DueCustomerResponse
+            {
+                Data = pagedData,
+                TotalDueCustomer = dueCustomers.Count,
+                TotalDueAmount = dueCustomers.Sum(c => c.DueAmount ?? 0),
+                CurrentPage = page,
+                PageSize = pageSize
+            };
+        }
+
     }
 }

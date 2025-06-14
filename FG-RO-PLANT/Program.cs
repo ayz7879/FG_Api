@@ -1,4 +1,5 @@
 using System.Text;
+using FG_RO_PLANT;
 using FG_RO_PLANT.Data;
 using FG_RO_PLANT.Helpers;
 using FG_RO_PLANT.Services;
@@ -15,6 +16,10 @@ var dbUsername = Environment.GetEnvironmentVariable("DB_USERNAME");
 var dbPassword = Environment.GetEnvironmentVariable("DB_PASSWORD");
 
 var connectionString = $"Host={dbHost};Port={dbPort};Database={dbName};Username={dbUsername};Password={dbPassword}";
+
+//var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+//var jwtSecret = builder.Configuration["JWT:Secret"] ?? throw new InvalidOperationException("JWT secret is missing");
+
 
 // Add services to the container.
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
@@ -111,6 +116,7 @@ else
 app.UseHttpsRedirection();
 
 app.UseAuthentication();
+app.UseMiddleware<ActiveUserMiddleware>();
 app.UseAuthorization();
 
 app.MapControllers();

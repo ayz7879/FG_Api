@@ -46,7 +46,7 @@ namespace FG_RO_PLANT.Services
         {
             _ = await _context.Customers.FindAsync(customerId) ?? throw new Exception("Customer not found");
 
-            var query = _context.DailyEntries.Where(e => e.CustomerId == customerId && e.Id > lastFetchId);
+            var query = _context.DailyEntries.Where(e => e.CustomerId == customerId);
 
             if (startDate.HasValue)
                 query = query.Where(e => e.DateField >= startDate.Value);
@@ -54,10 +54,19 @@ namespace FG_RO_PLANT.Services
             if (endDate.HasValue)
                 query = query.Where(e => e.DateField <= endDate.Value);
 
-            return await query
-                .OrderBy(e => e.Id)
-                .Take(pageSize)
-                .ToListAsync();
+            // If no date filters, apply pagination
+            if (!startDate.HasValue && !endDate.HasValue)
+            {
+                query = query.Where(e => e.Id > lastFetchId)
+                             .OrderBy(e => e.Id)
+                             .Take(pageSize);
+            }
+            else
+            {
+                query = query.OrderByDescending(e => e.DateField); 
+            }
+
+            return await query.ToListAsync();
         }
 
         // Edit Entry

@@ -37,8 +37,8 @@ namespace FG_RO_PLANT.Services
         public async Task<(string, string)> LoginAsync(LoginDto loginDto)
         {
             var existingUser = await _context.Users.FirstOrDefaultAsync(u => u.Email == loginDto.Email) ?? throw new UnauthorizedAccessException("User not found");
-            
-            if (!BCrypt.Net.BCrypt.Verify(loginDto.Password, existingUser.Password))
+
+                if (!BCrypt.Net.BCrypt.Verify(loginDto.Password, existingUser.Password))
                 throw new UnauthorizedAccessException("Incorrect password");
 
             if (!existingUser.IsActive)
@@ -48,68 +48,53 @@ namespace FG_RO_PLANT.Services
             return ("Login successful", token);
         }
 
-        // Get Users with Pagination
-        public async Task<List<User>> GetAllUsersAsync(int pageSize, int lastFetchId)
+        // Get User by search pagination
+        public async Task<(List<User> users, int totalCount)> GetUsersAsync(string searchTerm, int page = 1, int pageSize = 10)
         {
-            return await _context.Users.AsNoTracking().Where(u => u.Id > lastFetchId).OrderBy(u => u.Id)
-                .Take(pageSize)
-                .Select(u => new User
-                {
-                    Id = u.Id,
-                    Name = u.Name,
-                    Phone = u.Phone,
-                    Email = u.Email,
-                    Role = u.Role,
-                    IsActive = u.IsActive
-                })
-                .ToListAsync();
-        }
-
-        // Total count user
-        public async Task<int> GetTotalUserCountAsync()
-        {
-            return await _context.Users.AsNoTracking().CountAsync();
-        }
-
-        // Get User by search
-        public async Task<List<User>> SearchUsersAsync(string searchTerm, int pageSize, int lastFetchId)
-        {
-            var query = _context.Users.AsNoTracking().Where(u => u.Id > lastFetchId);
+            var query = _context.Users.AsNoTracking().AsQueryable();
 
             if (!string.IsNullOrEmpty(searchTerm))
             {
-                searchTerm = searchTerm.ToLower();
-                query = query.Where(u => u.Name.ToLower().Contains(searchTerm) ||
-                                         u.Phone.Contains(searchTerm) ||
-                                         u.Email.ToLower().Contains(searchTerm));
+                string term = searchTerm.ToLower();
+                query = query.Where(u =>
+                    u.Name.ToLower().Contains(term) ||
+                    u.Email.ToLower().Contains(term) ||
+                    u.Phone.ToLower().Contains(term));
             }
 
-            return await query.OrderBy(u => u.Id)
-                               .Take(pageSize)
-                               .Select(u => new User
-                               {
-                                   Id = u.Id,
-                                   Name = u.Name,
-                                   Phone = u.Phone,
-                                   Email = u.Email,
-                                   Role = u.Role,
-                                   IsActive = u.IsActive
-                               })
-                               .ToListAsync();
+            var totalCount = await query.AsNoTracking().CountAsync();
+
+            var users = await query
+            .OrderBy(u => u.Name) 
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .Select(u => new User
+            {
+                Id = u.Id,
+                Name = u.Name,
+                Email = u.Email,
+                Phone = u.Phone,
+                Role = u.Role,
+                IsActive = u.IsActive
+            })
+            .ToListAsync();
+
+            return (users, totalCount);
         }
 
         // Get User by ID
         public async Task<User> GetUserByIdAsync(int id)
         {
             var user = await _context.Users.FindAsync(id) ?? throw new Exception("User not found");
+            user.Password = null;
             return user;
         }
 
         // Update Profile
-        public async Task<string> UpdateProfileAsync(int id, RegisterDto registerDto)
+        public async Task<string> UpdateProfileAsync(int id, UpdateUserDto registerDto)
         {
             var existingUser = await _context.Users.FindAsync(id) ?? throw new Exception("User not found");
-            
+
             if (await _context.Users.AnyAsync(u => u.Email == registerDto.Email && u.Id != id))
             {
                 throw new Exception("Email already exists.");
@@ -118,8 +103,10 @@ namespace FG_RO_PLANT.Services
             existingUser.Name = registerDto.Name;
             existingUser.Email = registerDto.Email;
             existingUser.Phone = registerDto.Phone;
-            existingUser.Password = BCrypt.Net.BCrypt.HashPassword(registerDto.Password);
-
+            if (!string.IsNullOrEmpty(registerDto.Password))
+            {
+                existingUser.Password = BCrypt.Net.BCrypt.HashPassword(registerDto.Password);
+            }
             _context.Entry(existingUser).State = EntityState.Modified;
 
             await _context.SaveChangesAsync();
@@ -129,7 +116,9 @@ namespace FG_RO_PLANT.Services
         // Add User (Admin only)
         public async Task<string> AddUserAsync(RegisterDto registerDto)
         {
-            if (await _context.Users.AnyAsync(u => u.Email == registerDto.Email))
+            try
+            {
+                if (await _context.Users.AnyAsync(u => u.Email == registerDto.Email))
                 throw new Exception("User already exists");
 
             var user = new User
@@ -144,13 +133,21 @@ namespace FG_RO_PLANT.Services
             await _context.Users.AddAsync(user);
             await _context.SaveChangesAsync();
             return "User added successfully";
+
+            }
+            catch (Exception ex)
+            {
+                // Log full inner exception if available
+                var error = ex.InnerException?.Message ?? ex.Message;
+                throw new Exception("AddUser failed: " + error);
+            }
         }
 
         // Update User (Admin only)
-        public async Task<string> UpdateUserAsync(int id, RegisterDto registerDto)
+        public async Task<string> UpdateUserAsync(int id, UpdateUserDto registerDto)
         {
             var existingUser = await _context.Users.FindAsync(id) ?? throw new Exception("User not found");
-            
+
             if (existingUser.Role == UserRole.Admin)
             {
                 throw new Exception("You cannot edit an admin");
@@ -165,8 +162,10 @@ namespace FG_RO_PLANT.Services
             existingUser.Phone = registerDto.Phone;
             existingUser.Role = registerDto.Role;
             existingUser.IsActive = registerDto.IsActive;
-            existingUser.Password = BCrypt.Net.BCrypt.HashPassword(registerDto.Password);
-
+            if (!string.IsNullOrEmpty(registerDto.Password))
+            {
+                existingUser.Password = BCrypt.Net.BCrypt.HashPassword(registerDto.Password);
+            }
             _context.Entry(existingUser).State = EntityState.Modified;
 
             await _context.SaveChangesAsync();

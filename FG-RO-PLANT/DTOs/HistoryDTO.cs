@@ -22,5 +22,6 @@ namespace FG_RO_PLANT.DTOs
         public DailyEntry? DailyEntryData { get; set; }
         public string? CustomerName { get; set; }
         public string? CustomerAddress { get; set; }
+        public string? CustomerPhone { get; set; }
     }
 }
