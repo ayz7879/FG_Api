@@ -23,7 +23,10 @@ var connectionString = $"Host={dbHost};Port={dbPort};Database={dbName};Username=
 
 // Add services to the container.
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseNpgsql(connectionString));
+    options.UseNpgsql(connectionString, npgsqlOptions =>
+        npgsqlOptions.CommandTimeout(120) 
+    ));
+
 
 builder.Services.AddSingleton<JwtHelper>();
 builder.Services.AddScoped<UserService>();
