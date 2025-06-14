@@ -61,6 +61,15 @@ namespace FG_RO_PLANT.Controllers
 
             try
             {
+                // Check if user is accessing their own data or is an admin
+                var userIdClaim = User.FindFirst("UserId")?.Value;
+                if (!int.TryParse(userIdClaim, out int authenticatedUserId))
+                    return Unauthorized(new { message = "Invalid authentication token" });
+
+                bool isAdmin = User.IsInRole("Admin");
+                if (authenticatedUserId != id && !isAdmin)
+                    return Forbid("You don't have permission to access this user's data");
+
                 return Ok(new { message = "User found", data = await _userService.GetUserByIdAsync(id) });
             }
             catch (Exception ex)
@@ -82,6 +91,15 @@ namespace FG_RO_PLANT.Controllers
 
             try
             {
+                // Check if user is updating their own profile or is an admin
+                var userIdClaim = User.FindFirst("UserId")?.Value;
+                if (!int.TryParse(userIdClaim, out int authenticatedUserId))
+                    return Unauthorized(new { message = "Invalid authentication token" });
+
+                bool isAdmin = User.IsInRole("Admin");
+                if (authenticatedUserId != id && !isAdmin)
+                    return Forbid("You don't have permission to update this user's profile");
+
                 return Ok(new { message = await _userService.UpdateProfileAsync(id, user) });
             }
             catch (Exception ex)
