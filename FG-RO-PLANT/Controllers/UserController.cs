@@ -175,5 +175,9 @@ namespace FG_RO_PLANT.Controllers
                 return NotFound(new { message = ex.Message });
             }
         }
+
+        [HttpGet("health")]
+        public IActionResult Health() => Ok("I am alive");
+
     }
 }
