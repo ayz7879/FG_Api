@@ -177,7 +177,14 @@ namespace FG_RO_PLANT.Controllers
         }
 
         [HttpGet("health")]
-        public IActionResult Health() => Ok("I am alive");
+        [AllowAnonymous]
+        public IActionResult Health()
+        {
+            var ua = Request.Headers["User-Agent"].ToString();
+            Console.WriteLine($"Health ping by: {ua}");
+
+            return Ok("I am alive");
+        }
 
     }
 }
