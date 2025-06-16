@@ -35,5 +35,6 @@ namespace FG_RO_PLANT.DTOs
         [Required(ErrorMessage = "Customer Type is required.")]
         [Range(1, 2, ErrorMessage = "Customer Type must be either 1 (Regular) or 2 (Event).")]
         public CustomerType CustomerType { get; set; } = CustomerType.Regular;
+        public bool IsActive { get; set; } = false;
     }
 }

@@ -17,6 +17,8 @@
         public decimal? PricePerJar { get; set; }
         public decimal? PricePerCapsule { get; set; }
         public CustomerType CustomerType { get; set; } = CustomerType.Regular;
+        public bool IsActive { get; set; } = false;
+        public string? Token { get; set; }
     }
 
     public class CustomerPayment

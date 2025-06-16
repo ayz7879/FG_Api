@@ -25,7 +25,9 @@ namespace FG_RO_PLANT.Services
                 InitialDepositCapsule = customerDto.InitialDepositCapsule,
                 PricePerJar = customerDto.PricePerJar,
                 PricePerCapsule = customerDto.PricePerCapsule,
-                CustomerType = customerDto.CustomerType
+                CustomerType = customerDto.CustomerType,
+                IsActive = customerDto.IsActive,
+                Token = Guid.NewGuid().ToString()
             };
 
             await _context.Customers.AddAsync(customer);
@@ -37,6 +39,13 @@ namespace FG_RO_PLANT.Services
         public async Task<Customer> GetCustomerByIdAsync(int id)
         {
             var customer = await _context.Customers.FindAsync(id) ?? throw new Exception("Customer not found");
+            return customer;
+        }
+        
+        // Get Customer by token
+        public async Task<Customer> GetCustomerByTokenAsync(string token)
+        {
+            var customer = await _context.Customers.AsNoTracking().FirstOrDefaultAsync(c => c.Token == token && c.IsActive) ?? throw new UnauthorizedAccessException("Access denied.");
             return customer;
         }
 
@@ -113,6 +122,7 @@ namespace FG_RO_PLANT.Services
             existingCustomer.PricePerJar = updatedCustomer.PricePerJar;
             existingCustomer.PricePerCapsule = updatedCustomer.PricePerCapsule;
             existingCustomer.CustomerType = updatedCustomer.CustomerType;
+            existingCustomer.IsActive = updatedCustomer.IsActive;
 
             _context.Entry(existingCustomer).State = EntityState.Modified;
             await _context.SaveChangesAsync();

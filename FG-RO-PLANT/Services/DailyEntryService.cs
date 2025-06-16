@@ -165,5 +165,105 @@ namespace FG_RO_PLANT.Services
             };
         }
 
+
+        // Get All Entries for a public Customer (Paginated)
+        public async Task<List<DailyEntry>> GetPublicCustomerEntriesAsync(int customerId, int pageSize, int lastFetchId, DateOnly? startDate = null, DateOnly? endDate = null)
+        {
+            var isActive = await _context.Customers
+                .AsNoTracking()
+                .Where(c => c.Id == customerId)
+                .Select(c => c.IsActive)
+                .FirstOrDefaultAsync();
+
+            if (!isActive)
+                throw new UnauthorizedAccessException("Access denied.");
+
+            var query = _context.DailyEntries.Where(e => e.CustomerId == customerId);
+
+            if (startDate.HasValue)
+                query = query.Where(e => e.DateField >= startDate.Value);
+
+            if (endDate.HasValue)
+                query = query.Where(e => e.DateField <= endDate.Value);
+
+            // If no date filters, apply pagination
+            if (!startDate.HasValue && !endDate.HasValue)
+            {
+                lastFetchId = lastFetchId > 0 ? lastFetchId : int.MaxValue;
+                query = query.Where(e => e.Id < lastFetchId)
+                             .OrderByDescending(e => e.Id)
+                             .Take(pageSize);
+            }
+            else
+            {
+                query = query.OrderByDescending(e => e.DateField);
+            }
+
+            return await query.ToListAsync();
+        }
+
+
+        // Calculate specific public customer entries total
+        public async Task<object> GetPublicCustomerSummaryAsync(int customerId, DateOnly? startDate = null, DateOnly? endDate = null)
+        {
+            // ✅ Step 1: Validate customer existence and active status
+            var customer = await _context.Customers
+                .AsNoTracking()
+                .Where(c => c.Id == customerId)
+                .Select(c => new { c.IsActive, c.PricePerJar, c.PricePerCapsule })
+                .FirstOrDefaultAsync();
+
+            if (customer == null || !customer.IsActive)
+                throw new UnauthorizedAccessException("Access denied.");
+
+            // ✅ Step 2: Fetch aggregated totals directly for a specific customer from database
+            var query = _context.DailyEntries.AsNoTracking().Where(e => e.CustomerId == customerId);
+
+            if (startDate.HasValue)
+                query = query.Where(e => e.DateField >= startDate.Value);
+
+            if (endDate.HasValue)
+                query = query.Where(e => e.DateField <= endDate.Value);
+
+            var entryTotals = await query
+                .GroupBy(e => 1)
+                .Select(g => new
+                {
+                    TotalJarGiven = g.Sum(e => e.JarGiven),
+                    TotalJarTaken = g.Sum(e => e.JarTaken),
+                    TotalCapsuleGiven = g.Sum(e => e.CapsuleGiven),
+                    TotalCapsuleTaken = g.Sum(e => e.CapsuleTaken),
+                    TotalPaid = g.Sum(e => e.CustomerPay)
+                })
+                .FirstOrDefaultAsync();
+
+            if (entryTotals == null)
+                return new { Message = "No entries found for this customer." };
+
+
+            // Step 3: Calculate Payments
+            var totalJarPayment = entryTotals.TotalJarGiven * customer.PricePerJar;
+            var totalCapsulePayment = entryTotals.TotalCapsuleGiven * customer.PricePerCapsule;
+            var totalPayment = totalJarPayment + totalCapsulePayment;
+            var pendingPayment = totalPayment - entryTotals.TotalPaid;
+
+            // Step 4: Return Response
+            return new
+            {
+                CustomerId = customerId,
+                entryTotals.TotalJarGiven,
+                entryTotals.TotalJarTaken,
+                PendingJar = entryTotals.TotalJarGiven - entryTotals.TotalJarTaken,
+                entryTotals.TotalCapsuleGiven,
+                entryTotals.TotalCapsuleTaken,
+                PendingCapsule = entryTotals.TotalCapsuleGiven - entryTotals.TotalCapsuleTaken,
+                TotalJarPayment = totalJarPayment,
+                TotalCapsulePayment = totalCapsulePayment,
+                TotalPayment = totalPayment,
+                entryTotals.TotalPaid,
+                PendingPayment = pendingPayment
+            };
+        }
+
     }
 }

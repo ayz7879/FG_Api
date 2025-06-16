@@ -9,7 +9,11 @@ namespace FG_RO_PLANT
         {
             var path = context.Request.Path.Value?.ToLower();
 
-            if (path is not null && (path.Contains("/user/login") || path.Contains("/user/register") || path.Contains("/user/health")))
+            if (path is not null &&
+                (path.Contains("/user/login") ||
+                 path.Contains("/user/register") ||
+                 path.Contains("/user/health") ||
+                 path.Contains("/api/public-customer")))
             {
                 await next(context);
                 return;
