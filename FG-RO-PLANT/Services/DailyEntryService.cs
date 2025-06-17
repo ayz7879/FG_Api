@@ -57,8 +57,9 @@ namespace FG_RO_PLANT.Services
             // If no date filters, apply pagination
             if (!startDate.HasValue && !endDate.HasValue)
             {
-                query = query.Where(e => e.Id > lastFetchId)
-                             .OrderBy(e => e.Id)
+                lastFetchId = lastFetchId > 0 ? lastFetchId : int.MaxValue;
+                query = query.Where(e => e.Id < lastFetchId)
+                             .OrderByDescending(e => e.Id)
                              .Take(pageSize);
             }
             else
