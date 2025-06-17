@@ -19,6 +19,7 @@
         public CustomerType CustomerType { get; set; } = CustomerType.Regular;
         public bool IsActive { get; set; } = false;
         public string? Token { get; set; }
+        public int BillDay { get; set; } = 1;
     }
 
     public class CustomerPayment
@@ -30,6 +31,7 @@
         public decimal? PricePerJar { get; set; }
         public decimal? PricePerCapsule { get; set; }
         public int? DueAmount { get; set; }
+        public int? BillDay { get; set; }
     }
 
     public class DueCustomerResponse
