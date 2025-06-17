@@ -36,5 +36,8 @@ namespace FG_RO_PLANT.DTOs
         [Range(1, 2, ErrorMessage = "Customer Type must be either 1 (Regular) or 2 (Event).")]
         public CustomerType CustomerType { get; set; } = CustomerType.Regular;
         public bool IsActive { get; set; } = false;
+
+        [Range(1, 31, ErrorMessage = "BillDay must be between 1 and 31.")]
+        public int BillDay { get; set; } = 1;
     }
 }

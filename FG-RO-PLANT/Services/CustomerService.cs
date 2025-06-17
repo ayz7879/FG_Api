@@ -27,7 +27,8 @@ namespace FG_RO_PLANT.Services
                 PricePerCapsule = customerDto.PricePerCapsule,
                 CustomerType = customerDto.CustomerType,
                 IsActive = customerDto.IsActive,
-                Token = Guid.NewGuid().ToString()
+                Token = Guid.NewGuid().ToString(),
+                BillDay = customerDto.BillDay,
             };
 
             await _context.Customers.AddAsync(customer);
@@ -123,6 +124,7 @@ namespace FG_RO_PLANT.Services
             existingCustomer.PricePerCapsule = updatedCustomer.PricePerCapsule;
             existingCustomer.CustomerType = updatedCustomer.CustomerType;
             existingCustomer.IsActive = updatedCustomer.IsActive;
+            existingCustomer.BillDay = updatedCustomer.BillDay;
 
             _context.Entry(existingCustomer).State = EntityState.Modified;
             await _context.SaveChangesAsync();
@@ -152,7 +154,7 @@ namespace FG_RO_PLANT.Services
                       c.Phone.ToLower().Contains(loweredSearch) ||
                       c.Address.ToLower().Contains(loweredSearch)
                 group new { e.JarGiven, e.CapsuleGiven, e.CustomerPay, c.PricePerJar, c.PricePerCapsule }
-                by new { c.Id, c.Name, c.Address, c.Phone, c.PricePerJar, c.PricePerCapsule } into g
+                by new { c.Id, c.Name, c.Address, c.Phone, c.PricePerJar, c.PricePerCapsule, c.BillDay } into g
                 select new
                 {
                     Customer = g.Key,
@@ -171,7 +173,8 @@ namespace FG_RO_PLANT.Services
                     Phone = x.Customer.Phone,
                     PricePerJar = x.Customer.PricePerJar,
                     PricePerCapsule = x.Customer.PricePerCapsule,
-                    DueAmount = (int)((x.TotalJar * x.Customer.PricePerJar) + (x.TotalCapsule * x.Customer.PricePerCapsule) - x.TotalPaid)
+                    DueAmount = (int)((x.TotalJar * x.Customer.PricePerJar) + (x.TotalCapsule * x.Customer.PricePerCapsule) - x.TotalPaid),
+                    BillDay = x.Customer.BillDay
                 })
                 .Where(x => x.DueAmount > 0)
                 .OrderByDescending(x => x.DueAmount)
