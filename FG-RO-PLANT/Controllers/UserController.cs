@@ -53,7 +53,7 @@ namespace FG_RO_PLANT.Controllers
 
         // Get User by ID
         [HttpGet("{id}")]
-        [Authorize]
+        [Authorize(Roles = "User,Admin")]
         public async Task<IActionResult> GetUserById(int id)
         {
             if (id <= 0)
@@ -71,7 +71,7 @@ namespace FG_RO_PLANT.Controllers
 
         // Update Profile
         [HttpPut("updateProfile/{id}")]
-        [Authorize]
+        [Authorize(Roles = "User,Admin")]
         public async Task<IActionResult> UpdateProfile(int id, UpdateUserDto user)
         {
             if (id <= 0)

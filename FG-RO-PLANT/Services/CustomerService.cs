@@ -1,13 +1,15 @@
 ﻿using FG_RO_PLANT.Data;
 using FG_RO_PLANT.DTOs;
+using FG_RO_PLANT.Helpers;
 using FG_RO_PLANT.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace FG_RO_PLANT.Services
 {
-    public class CustomerService(ApplicationDbContext context)
+    public class CustomerService(ApplicationDbContext context, JwtHelper jwtService)
     {
         private readonly ApplicationDbContext _context = context;
+        private readonly JwtHelper _jwtService = jwtService;
 
         // Add Customer
         public async Task<string> AddCustomerAsync(CustomerDTO customerDto)
@@ -194,6 +196,25 @@ namespace FG_RO_PLANT.Services
                 CurrentPage = page,
                 PageSize = pageSize
             };
+        }
+
+        // Login Customer
+        public async Task<(string, string)> CustomerLoginAsync(string phoneNumber)
+        {
+            var existingCustomer = await _context.Customers.FirstOrDefaultAsync(u => u.Phone == phoneNumber) ?? throw new UnauthorizedAccessException("Customer not found");
+
+            if (!existingCustomer.IsActive)
+                throw new UnauthorizedAccessException("Account inactive");
+
+                var user = new User
+                {
+                    Id = existingCustomer.Id,
+                    Name = existingCustomer.Name,
+                    Role = UserRole.Customer,
+                };
+
+            var token = _jwtService.GenerateToken(user);
+            return ("Login successful", token);
         }
 
     }

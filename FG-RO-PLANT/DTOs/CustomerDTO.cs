@@ -40,4 +40,9 @@ namespace FG_RO_PLANT.DTOs
         [Range(1, 31, ErrorMessage = "BillDay must be between 1 and 31.")]
         public int BillDay { get; set; } = 1;
     }
+
+    public class CustomerLoginDto
+    {
+        public string PhoneNumber { get; set; } = string.Empty;
+    }
 }

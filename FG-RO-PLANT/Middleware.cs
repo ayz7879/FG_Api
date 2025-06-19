@@ -1,4 +1,5 @@
-﻿using FG_RO_PLANT.Data;
+﻿using System.Security.Claims;
+using FG_RO_PLANT.Data;
 using FG_RO_PLANT.Services;
 
 namespace FG_RO_PLANT
@@ -11,6 +12,7 @@ namespace FG_RO_PLANT
 
             if (path is not null &&
                 (path.Contains("/user/login") ||
+                 path.Contains("/customer/login") ||
                  path.Contains("/user/register") ||
                  path.Contains("/user/health") ||
                  path.Contains("/api/public-customer")))
@@ -19,24 +21,37 @@ namespace FG_RO_PLANT
                 return;
             }
 
-            var userIdClaim = context.User.FindFirst("UserId")?.Value;
 
-            if (context.User.Identity?.IsAuthenticated != true || !int.TryParse(userIdClaim, out var userId))
+            if (context.User.Identity?.IsAuthenticated != true)
             {
-                await next(context); // Not authenticated properly — skip, let auth handle
+                context.Response.StatusCode = 401;
+                await context.Response.WriteAsync("Unauthorized");
                 return;
             }
 
-            var dbContext = context.RequestServices.GetRequiredService<ApplicationDbContext>();
-            var user = await dbContext.Users.FindAsync(userId);
+            var userIdClaim = context.User.FindFirst("UserId")?.Value;
+            var roleClaim = context.User.FindFirst(ClaimTypes.Role)?.Value;
 
-            context.Response.StatusCode = 401;
-            if (user is null)
-                await context.Response.WriteAsync("User is deleted.");
-            else if (!user.IsActive)
-                await context.Response.WriteAsync("User is inactive.");
-            else
-                await next(context); // ✅ Valid user → continue
+            if (!int.TryParse(userIdClaim, out var userId) || string.IsNullOrEmpty(roleClaim))
+            {
+                context.Response.StatusCode = 401;
+                await context.Response.WriteAsync("Invalid token claims");
+                return;
+            }
+
+            var db = context.RequestServices.GetRequiredService<ApplicationDbContext>();
+            bool? isActive = roleClaim.ToLower() == "customer"
+                ? (await db.Customers.FindAsync(userId))?.IsActive
+                : (await db.Users.FindAsync(userId))?.IsActive;
+
+            if (isActive != true)
+            {
+                context.Response.StatusCode = 401;
+                await context.Response.WriteAsync(isActive == null ? "User is deleted." : "User is inactive.");
+                return;
+            }
+
+            await next(context); // ✅ Valid user → continue
         }
     }
 }
