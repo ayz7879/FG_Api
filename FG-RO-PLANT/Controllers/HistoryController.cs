@@ -14,6 +14,7 @@ namespace FG_RO_PLANT.Controllers
 
         // Get History by Date Range
         [HttpGet("all")]
+        [Authorize(Roles = "User,Admin")]
         public async Task<IActionResult> GetHistory([FromQuery] HistoryDTO historyDto)
         {
             if (!ModelState.IsValid)
@@ -33,6 +34,7 @@ namespace FG_RO_PLANT.Controllers
 
         // Get History Summary
         [HttpGet("summary")]
+        [Authorize(Roles = "User,Admin")]
         public async Task<IActionResult> GetHistorySummary([FromQuery] DateOnly? startDate, [FromQuery] DateOnly? endDate)
         {
             try

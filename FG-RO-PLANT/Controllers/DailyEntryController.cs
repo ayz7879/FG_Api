@@ -14,6 +14,7 @@ namespace FG_RO_PLANT.Controllers
 
         // Add Daily Entry
         [HttpPost("add")]
+        [Authorize(Roles = "User,Admin")]
         public async Task<IActionResult> AddEntry(DailyEntryDTO dailyEntryDto)
         {
             if (!ModelState.IsValid)
@@ -31,6 +32,7 @@ namespace FG_RO_PLANT.Controllers
 
         // Get Entry by ID
         [HttpGet("{id}")]
+        [Authorize(Roles = "User,Admin")]
         public async Task<IActionResult> GetEntryById(int id)
         {
             if (id <= 0)
@@ -48,6 +50,7 @@ namespace FG_RO_PLANT.Controllers
 
         // Get All Entries for a Customer (Paginated)
         [HttpGet("customer/{customerId}")]
+        [Authorize(Roles = "User,Admin,Customer")]
         public async Task<IActionResult> GetCustomerEntries(int customerId, [FromQuery] DailyEntriesQuery query)
         {
             if (customerId <= 0)
@@ -76,6 +79,7 @@ namespace FG_RO_PLANT.Controllers
 
         // Get Customer's Daily Entry Summary
         [HttpGet("summary/{customerId}")]
+        [Authorize(Roles = "User,Admin,Customer")]
         public async Task<IActionResult> GetCustomerSummary(int customerId, [FromQuery] DailyEntriesQuery query)
         {
             if (customerId <= 0)

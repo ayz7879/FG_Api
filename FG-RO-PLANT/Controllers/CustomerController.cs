@@ -7,13 +7,13 @@ namespace FG_RO_PLANT.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
-    [Authorize]
     public class CustomerController(CustomerService customerService) : ControllerBase
     {
         private readonly CustomerService _customerService = customerService;
 
         // Add Customer
         [HttpPost("add")]
+        [Authorize(Roles = "User,Admin")]
         public async Task<IActionResult> AddCustomer(CustomerDTO customer)
         {
             if (!ModelState.IsValid)
@@ -31,6 +31,7 @@ namespace FG_RO_PLANT.Controllers
 
         // Get Customer by ID
         [HttpGet("{id}")]
+        [Authorize(Roles = "User,Admin,Customer")]
         public async Task<IActionResult> GetCustomerById(int id)
         {
             if (id <= 0)
@@ -48,6 +49,7 @@ namespace FG_RO_PLANT.Controllers
 
         // Get All Customers with Pagination
         [HttpGet("all")]
+        [Authorize(Roles = "User,Admin")]
         public async Task<IActionResult> GetAllCustomers([FromQuery] int pageSize = 10, [FromQuery] int lastFetchId = 0, [FromQuery] int customerType = 0)
         {
             if (customerType < 0 || customerType > 2)
@@ -68,6 +70,7 @@ namespace FG_RO_PLANT.Controllers
 
         // Get Total Customer Count
         [HttpGet("count")]
+        [Authorize(Roles = "User,Admin")]
         public async Task<IActionResult> GetTotalCustomerCountAsync()
         {
             try
@@ -88,6 +91,7 @@ namespace FG_RO_PLANT.Controllers
 
         // Search Customers
         [HttpGet("search")]
+        [Authorize(Roles = "User,Admin")]
         public async Task<IActionResult> SearchCustomers([FromQuery] string searchTerm = "", [FromQuery] int pageSize = 10, [FromQuery] int lastFetchId = 0)
         {
             try
@@ -143,12 +147,35 @@ namespace FG_RO_PLANT.Controllers
 
         // Get due customers
         [HttpGet("due-customers")]
+        [Authorize(Roles = "User,Admin")]
         public async Task<IActionResult> GetDueCustomers(int page = 1, int pageSize = 10, string? search = null)
         {
             try
             {
                 var result = await _customerService.GetDueCustomersAsync(page, pageSize, search);
                 return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        // Login Customer
+        [HttpPost("login")]
+        public async Task<IActionResult> CustomerLogin([FromBody] CustomerLoginDto dto)
+        {
+            if (!ModelState.IsValid)
+                return BadRequest(new { message = ModelState });
+
+            try
+            {
+                var (message, token) = await _customerService.CustomerLoginAsync(dto.PhoneNumber);
+                return Ok(new { message, token });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Unauthorized(new { message = ex.Message });
             }
             catch (Exception ex)
             {

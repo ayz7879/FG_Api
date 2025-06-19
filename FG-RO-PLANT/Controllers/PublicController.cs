@@ -13,7 +13,7 @@ namespace FG_RO_PLANT.Controllers
 
         // Get Customer by Token
         [HttpGet("{token}")]
-        public async Task<IActionResult> GetCustomerById(string token)
+        public async Task<IActionResult> GetCustomerByToken(string token)
         {
             if (string.IsNullOrWhiteSpace(token))
                 return Unauthorized(new { message = "Access denied." });
