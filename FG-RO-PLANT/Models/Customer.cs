@@ -1,4 +1,6 @@
-﻿namespace FG_RO_PLANT.Models
+﻿using FG_RO_PLANT.DTOs;
+
+namespace FG_RO_PLANT.Models
 {
     public enum CustomerType
     {
@@ -20,6 +22,9 @@
         public bool IsActive { get; set; } = false;
         public string? Token { get; set; }
         public int BillDay { get; set; } = 1;
+        public bool IsBillDone { get; set; } = false;
+        public DateOnly? BillDoneDate { get; set; }
+
     }
 
     public class CustomerPayment

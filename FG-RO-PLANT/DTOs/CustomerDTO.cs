@@ -45,4 +45,20 @@ namespace FG_RO_PLANT.DTOs
     {
         public string PhoneNumber { get; set; } = string.Empty;
     }
+
+    public class DueCustomerDto
+    {
+        public Customer Customer { get; set; } = default!;
+        public int DueAmount { get; set; }
+    }
+
+    public class TodayDueCustomerResponse
+    {
+        public List<DueCustomerDto> Data { get; set; } = [];
+        public int TotalDueCustomer { get; set; }
+        public int TotalDueAmount { get; set; }
+        public int CurrentPage { get; set; }
+        public int PageSize { get; set; }
+    }
+
 }
