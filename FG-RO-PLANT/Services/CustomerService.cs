@@ -17,6 +17,10 @@ namespace FG_RO_PLANT.Services
             if (await _context.Customers.AnyAsync(c => c.Phone == customerDto.Phone))
                 throw new Exception("Customer already exists");
 
+var indiaTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow,
+        TimeZoneInfo.FindSystemTimeZoneById("India Standard Time"));
+    var today = DateOnly.FromDateTime(indiaTime.Date);
+
             var customer = new Customer
             {
                 Name = customerDto.Name,
@@ -31,6 +35,9 @@ namespace FG_RO_PLANT.Services
                 IsActive = customerDto.IsActive,
                 Token = Guid.NewGuid().ToString(),
                 BillDay = customerDto.BillDay,
+
+IsBillDone = customerDto.BillDay == today.Day,
+        BillDoneDate = customerDto.BillDay == today.Day ? today : null
             };
 
             await _context.Customers.AddAsync(customer);
