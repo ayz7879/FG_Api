@@ -1,4 +1,5 @@
 ﻿using FG_RO_PLANT.DTOs;
+using FG_RO_PLANT.Models;
 using FG_RO_PLANT.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -161,6 +162,21 @@ namespace FG_RO_PLANT.Controllers
             }
         }
 
+        [HttpGet("todayDue-customers")]
+        [Authorize(Roles = "User,Admin")]
+        public async Task<IActionResult> GetTodayDueCustomers([FromQuery] int page = 1, [FromQuery] int pageSize = 10, [FromQuery] string? search = null)
+        {
+            try
+            {
+                var result = await _customerService.GetTodayDueCustomersAsync(page, pageSize, search);
+                return Ok(result);
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
         // Login Customer
         [HttpPost("login")]
         public async Task<IActionResult> CustomerLogin([FromBody] CustomerLoginDto dto)
@@ -182,5 +198,27 @@ namespace FG_RO_PLANT.Controllers
                 return BadRequest(new { message = ex.Message });
             }
         }
+
+        [HttpPatch("mark-as-done/{customerId}")]
+        [Authorize(Roles = "User,Admin")]
+        public async Task<IActionResult> MarkAsDone(int customerId)
+        {
+            if (customerId <= 0)
+                return BadRequest(new { message = "Invalid Customer ID." });
+
+            try
+            {
+                var result = await _customerService.MarkAsDoneAsync(customerId);
+                if (!result)
+                    return NotFound(new { message = "Customer not found." });
+
+                return Ok(new { message = "Marked as done." });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = "Error", error = ex.Message });
+            }
+        }
+
     }
 }

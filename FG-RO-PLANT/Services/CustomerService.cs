@@ -147,52 +147,49 @@ namespace FG_RO_PLANT.Services
         public async Task<DueCustomerResponse> GetDueCustomersAsync(int page, int pageSize, string? search)
         {
             var loweredSearch = search?.ToLower();
-            // First get aggregated data using raw SQL or simpler LINQ
-            var customerDueData = await (
-                from c in _context.Customers.AsNoTracking()
-                join e in _context.DailyEntries.AsNoTracking() on c.Id equals e.CustomerId
-                where string.IsNullOrEmpty(loweredSearch) ||
-                      c.Name.ToLower().Contains(loweredSearch) ||
-                      c.Phone.ToLower().Contains(loweredSearch) ||
-                      c.Address.ToLower().Contains(loweredSearch)
-                group new { e.JarGiven, e.CapsuleGiven, e.CustomerPay, c.PricePerJar, c.PricePerCapsule }
-                by new { c.Id, c.Name, c.Address, c.Phone, c.PricePerJar, c.PricePerCapsule, c.BillDay } into g
-                select new
-                {
-                    Customer = g.Key,
-                    TotalJar = g.Sum(x => x.JarGiven),
-                    TotalCapsule = g.Sum(x => x.CapsuleGiven),
-                    TotalPaid = g.Sum(x => x.CustomerPay)
-                }).ToListAsync();
 
-            // Calculate due amounts in memory (small dataset after grouping)
-            var dueCustomers = customerDueData
-                .Select(x => new CustomerPayment
-                {
-                    Id = x.Customer.Id,
-                    Name = x.Customer.Name,
-                    Address = x.Customer.Address,
-                    Phone = x.Customer.Phone,
-                    PricePerJar = x.Customer.PricePerJar,
-                    PricePerCapsule = x.Customer.PricePerCapsule,
-                    DueAmount = (int)((x.TotalJar * x.Customer.PricePerJar) + (x.TotalCapsule * x.Customer.PricePerCapsule) - x.TotalPaid),
-                    BillDay = x.Customer.BillDay
-                })
-                .Where(x => x.DueAmount > 0)
+            // Create base query with all calculations done at DB level
+            var baseQuery = from c in _context.Customers.AsNoTracking()
+                            join e in _context.DailyEntries.AsNoTracking() on c.Id equals e.CustomerId into entries
+                            where string.IsNullOrEmpty(loweredSearch) ||
+                                  c.Name.ToLower().Contains(loweredSearch) ||
+                                  c.Phone.ToLower().Contains(loweredSearch) ||
+                                  c.Address.ToLower().Contains(loweredSearch)
+                            let totalJar = entries.Sum(x => x.JarGiven)
+                            let totalCapsule = entries.Sum(x => x.CapsuleGiven)
+                            let totalPaid = entries.Sum(x => x.CustomerPay)
+                            let dueAmount = (totalJar * c.PricePerJar) + (totalCapsule * c.PricePerCapsule) - totalPaid
+                            where dueAmount > 0
+                            select new CustomerPayment
+                            {
+                                Id = c.Id,
+                                Name = c.Name,
+                                Address = c.Address,
+                                Phone = c.Phone,
+                                PricePerJar = c.PricePerJar,
+                                PricePerCapsule = c.PricePerCapsule,
+                                DueAmount = (int)dueAmount,
+                                BillDay = c.BillDay
+                            };
+
+            // Get total count for pagination info (before applying skip/take)
+            var totalCount = await baseQuery.CountAsync();
+
+            // Get total due amount for all customers (before pagination)
+            var totalDueAmount = await baseQuery.SumAsync(x => x.DueAmount ?? 0);
+
+            // Apply sorting and pagination at DB level
+            var pagedData = await baseQuery
                 .OrderByDescending(x => x.DueAmount)
-                .ToList();
-
-            // Apply pagination
-            var pagedData = dueCustomers
                 .Skip((page - 1) * pageSize)
                 .Take(pageSize)
-                .ToList();
+                .ToListAsync();
 
             return new DueCustomerResponse
             {
                 Data = pagedData,
-                TotalDueCustomer = dueCustomers.Count,
-                TotalDueAmount = dueCustomers.Sum(c => c.DueAmount ?? 0),
+                TotalDueCustomer = totalCount,
+                TotalDueAmount = totalDueAmount,
                 CurrentPage = page,
                 PageSize = pageSize
             };
@@ -217,5 +214,132 @@ namespace FG_RO_PLANT.Services
             return ("Login successful", token);
         }
 
+        // Get Today due customer
+        public async Task<TodayDueCustomerResponse> GetTodayDueCustomersAsync(int page, int pageSize, string? search)
+        {
+            var indiaTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow,
+                TimeZoneInfo.FindSystemTimeZoneById("India Standard Time"));
+            int today = indiaTime.Day;
+            int currentMonth = indiaTime.Month;
+            var loweredSearch = search?.ToLower();
+
+            // 🔁 Step 1: Auto reset IsBillDone = false if BillDoneDate is old + amount pending
+            var resetList = await (
+                from c in _context.Customers
+                join e in _context.DailyEntries on c.Id equals e.CustomerId
+                where c.BillDay == today &&
+                      c.IsBillDone &&
+                      (
+                          !c.BillDoneDate.HasValue ||
+                          c.BillDoneDate.Value.Month != currentMonth
+                      )
+                group new { e, c } by new { c.Id, c.PricePerJar, c.PricePerCapsule } into g
+                select new
+                {
+                    CustomerId = g.Key.Id,
+                    DueAmount = (int)(
+                        g.Sum(x => x.e.JarGiven) * g.Key.PricePerJar +
+                        g.Sum(x => x.e.CapsuleGiven) * g.Key.PricePerCapsule -
+                        g.Sum(x => x.e.CustomerPay)
+                    )
+                }
+            ).ToListAsync();
+
+            var resetCustomerIds = resetList
+                .Where(x => x.DueAmount > 0)
+                .Select(x => x.CustomerId)
+                .ToList();
+
+            if (resetCustomerIds.Count != 0)
+            {
+                await _context.Customers
+                    .Where(c => resetCustomerIds.Contains(c.Id))
+                    .ExecuteUpdateAsync(set => set
+                        .SetProperty(c => c.IsBillDone, false)
+                        .SetProperty(c => c.BillDoneDate, (DateOnly?)null));
+            }
+
+            // ✅ Step 2: Create base query for due customers (DB LEVEL FIXED VERSION)
+            var baseQuery = from grouped in (
+                                from c in _context.Customers.AsNoTracking()
+                                join e in _context.DailyEntries.AsNoTracking() on c.Id equals e.CustomerId
+                                where !c.IsBillDone &&
+                                      (string.IsNullOrEmpty(loweredSearch) ||
+                                       EF.Functions.Like(c.Name.ToLower(), $"%{loweredSearch}%") ||
+                                       EF.Functions.Like(c.Phone.ToLower(), $"%{loweredSearch}%") ||
+                                       EF.Functions.Like(c.Address.ToLower(), $"%{loweredSearch}%"))
+                                group e by new { c.Id, c.Name, c.Phone, c.Address, c.PricePerJar, c.PricePerCapsule, c.BillDay } into g
+                                select new
+                                {
+                                    CustomerId = g.Key.Id,
+                                    CustomerName = g.Key.Name,
+                                    CustomerPhone = g.Key.Phone,
+                                    CustomerAddress = g.Key.Address,
+                                    PricePerJar = g.Key.PricePerJar,
+                                    PricePerCapsule = g.Key.PricePerCapsule,
+                                    BillDay = g.Key.BillDay,
+                                    DueAmount = (int)(g.Sum(x => x.JarGiven) * g.Key.PricePerJar +
+                                                     g.Sum(x => x.CapsuleGiven) * g.Key.PricePerCapsule -
+                                                     g.Sum(x => x.CustomerPay))
+                                }
+                            )
+                            where grouped.DueAmount > 0
+                            select new DueCustomerDto
+                            {
+                                Customer = new Customer
+                                {
+                                    Id = grouped.CustomerId,
+                                    Name = grouped.CustomerName,
+                                    Phone = grouped.CustomerPhone,
+                                    Address = grouped.CustomerAddress,
+                                    PricePerJar = grouped.PricePerJar,
+                                    PricePerCapsule = grouped.PricePerCapsule,
+                                    BillDay = grouped.BillDay
+                                },
+                                DueAmount = grouped.DueAmount
+                            };
+
+            // Get TODAY's due customers count and amount only
+            var todayDueCustomers = await baseQuery
+                .Where(x => x.Customer.BillDay == today)
+                .Select(x => new { x.DueAmount })
+                .ToListAsync();
+
+            var todayDueCustomerCount = todayDueCustomers.Count;
+            var todayTotalDueAmount = todayDueCustomers.Sum(x => x.DueAmount);
+
+            // Get paginated data with proper ordering
+            var pagedData = await baseQuery
+                .OrderByDescending(x => x.Customer.BillDay == today ? int.MaxValue : x.Customer.BillDay)
+                .ThenByDescending(x => x.DueAmount)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            return new TodayDueCustomerResponse
+            {
+                Data = pagedData,
+                TotalDueCustomer = todayDueCustomerCount,  // Only today's customers
+                TotalDueAmount = todayTotalDueAmount,      // Only today's due amount
+                CurrentPage = page,
+                PageSize = pageSize
+            };
+        }
+        // Mark as done bill send api 
+        public async Task<bool> MarkAsDoneAsync(int customerId)
+        {
+            var indiaTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow,
+                TimeZoneInfo.FindSystemTimeZoneById("India Standard Time"));
+            var todayDate = DateOnly.FromDateTime(indiaTime);
+
+            var customer = await _context.Customers.FindAsync(customerId);
+            if (customer is null) return false;
+
+            customer.IsBillDone = true;
+            customer.BillDoneDate = todayDate;
+
+            await _context.SaveChangesAsync();
+            return true;
+        }
     }
 }
