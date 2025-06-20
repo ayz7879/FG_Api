@@ -116,6 +116,11 @@ namespace FG_RO_PLANT.Services
                 }
             }
 
+if (existingCustomer.BillDay != updatedCustomer.BillDay)
+{
+    existingCustomer.BillDoneDate = null; // ✅ Reset done status
+}
+
             existingCustomer.Name = updatedCustomer.Name;
             existingCustomer.Address = updatedCustomer.Address;
             existingCustomer.Phone = updatedCustomer.Phone;
